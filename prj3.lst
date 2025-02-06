@@ -1,0 +1,543 @@
+    1                   #s0 = year, s1 = month, s2 = day, s3 = hour, s4 = minute, s5 = second
+    2                   #s6 = AM/PM, s7 = Leap Year, t8 = Number of days in Month, t9 = First day of month
+    3                   
+    4                  		.data
+    5 10010000 000a	newline:	.asciiz	"\n"
+    6 10010002 0020	space:	.asciiz	" "
+    7 10010004 003a	colon:	.asciiz	":"
+    8                   
+    9 10010006 756e614a	m1:	.asciiz	"January"
+   10 1001000e 75626546	m2:	.asciiz	"Febuary"
+   11 10010016 6372614d	m3:	.asciiz	"March"
+   12 1001001c 69727041	m4:	.asciiz	"April"
+   13 10010022 0079614d	m5:	.asciiz	"May"
+   14 10010026 656e754a	m6:	.asciiz	"June"
+   15 1001002b 796c754a	m7:	.asciiz	"July"
+   16 10010030 75677541	m8:	.asciiz	"August"
+   17 10010037 74706553	m9:	.asciiz	"September"
+   18 10010041 6f74634f	m10:	.asciiz	"October"
+   19 10010049 65766f4e	m11:	.asciiz	"November"
+   20 10010052 65636544	m12:	.asciiz	"December"
+   21 1001005c 10010006	monthNames:	.word	m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12
+   22 1001008c 004d41	ampm:	.asciiz	"AM"
+   23 1001008f 004d50		.asciiz	"PM"
+   24                   
+   25 10010092 1e1f1c1f	days_normal:	.byte	31,28,31,30,31,30,31,31,30,31,30,31
+   26 1001009e 1e1f1d1f	days_leap:	.byte	31,29,31,30,31,30,31,31,30,31,30,31
+   27                   
+   28                  		.text
+   29 0040022c         		.globl main
+   30                   
+   31                   # Perform the date_time syscall to get current date
+   32                   getDate:
+   33 00400000 0000080c		syscall	$date_time
+   34 00400004 00038242		srl	$s0,$v1,9         # Extract year into $s0
+   35 00400008 3210ffff		andi	$s0,$s0,0x7FFFFF # Isolate year
+   36 0040000c 00038942		srl	$s1,$v1,5         # Extract month into $s1
+   37 00400010 3231000f		andi	$s1,$s1,0xF      # Isolate month
+   38 00400014 3072001f		andi	$s2,$v1,0x1F     # Extract day into $s2 (Isolate day)
+   39                   
+   40                   	# Extract hour (5 bits)
+   41 00400018 00029ec2		srl	$s3,$v0,27      # Shift right to align hour bits to the least significant bits
+   42                   	
+   43                   	# Extract minute (6 bits)
+   44 0040001c 0002a140		sll	$s4,$v0,5       # Shift left to remove hour bits
+   45 00400020 0014a682		srl	$s4,$s4,26      # Shift right to align minute bits to the least significant bits
+   46                   	
+   47                   	# Extract second (6 bits)
+   48 00400024 0002aac0		sll	$s5,$v0,11      # Shift left to remove hour and minute bits
+   49 00400028 0015ae82		srl	$s5,$s5,26      # Shift right to align second bits to the least significant bits
+   50                   	
+   51                   
+   52                  		la	$s6,ampm	#Calculate PM or AM
+   52 0040002c 3c161001		lui	$s6,0x1001
+   52 00400030 36d6008c		ori	$s6,$s6,0x8C
+   53                   
+   54 00400034 23bdfff8		addi	$sp,$sp,-8
+   55 00400038 afbf0000		sw	$ra,0($sp)
+   56 0040003c afa90004		sw	$t1,4($sp)
+   57                   
+   58 00400040 2269fff4		addi	$t1,$s3,-12
+   59                  		addi	$s6,3	# Initialize to PM
+   59 00400044 22d60003		addi	$s6,$s6,3
+   60 00400048 05300004		bltzal	$t1,AM	# If hour < 0, set to AM
+   61                   
+   62 0040004c 8fbf0000		lw	$ra,0($sp)
+   63 00400050 8fa90004		lw	$t1,4($sp)
+   64 00400054 23bd0008		addi	$sp,$sp,8
+   65                   
+   66 00400058 03e00008		jr	$ra
+   67                   
+   68                   AM:	
+   69                  		addi	$s6,-3
+   69 0040005c 22d6fffd		addi	$s6,$s6,-3
+   70 00400060 03e00008		jr	$ra
+   71                   
+   72                   print_date:
+   73 00400064 8d44fffc		lw	$a0,-4($t2)
+   74 00400068 0000010c		syscall	$print_string            # Print month name
+   75                  	 	la	$a0,space
+   75 0040006c 3c041001		lui	$a0,0x1001
+   75 00400070 34840002		ori	$a0,$a0,0x02
+   76 00400074 0000010c		syscall	$print_string            # Print space
+   77 00400078 02402021		move	$a0,$s2
+   78 0040007c 0000004c	 	syscall	$print_int             # Print day
+   79                  	 	la	$a0,space
+   79 00400080 3c041001		lui	$a0,0x1001
+   79 00400084 34840002		ori	$a0,$a0,0x02
+   80 00400088 0000010c		syscall	$print_string            # Print space
+   81 0040008c 02002021		move	$a0,$s0
+   82 00400090 0000004c	 	syscall	$print_int             # Print year
+   83                  	 	la	$a0,space
+   83 00400094 3c041001		lui	$a0,0x1001
+   83 00400098 34840002		ori	$a0,$a0,0x02
+   84 0040009c 0000010c		syscall	$print_string            # Print space
+   85 004000a0 02602021		move	$a0,$s3
+   86 004000a4 0000004c	 	syscall	$print_int             # Print hour
+   87                  	 	la	$a0,colon
+   87 004000a8 3c041001		lui	$a0,0x1001
+   87 004000ac 34840004		ori	$a0,$a0,0x04
+   88 004000b0 0000010c	 	syscall	$print_string            # Print colon
+   89 004000b4 02802021		move	$a0,$s4
+   90 004000b8 0000004c	 	syscall	$print_int             # Print minute
+   91                  	 	la	$a0,colon
+   91 004000bc 3c041001		lui	$a0,0x1001
+   91 004000c0 34840004		ori	$a0,$a0,0x04
+   92 004000c4 0000010c	 	syscall	$print_string            # Print colon
+   93 004000c8 02a02021		move	$a0,$s5
+   94 004000cc 0000004c	 	syscall	$print_int             # Print second
+   95                  	 	la	$a0,space
+   95 004000d0 3c041001		lui	$a0,0x1001
+   95 004000d4 34840002		ori	$a0,$a0,0x02
+   96 004000d8 0000010c		syscall	$print_string            # Print space
+   97 004000dc 02c02021		move	$a0,$s6
+   98 004000e0 0000010c	 	syscall	$print_string             # Print am/pm
+   99                  	 	la	$a0,newline
+   99 004000e4 3c041001		lui	$a0,0x1001
+   99 004000e8 34840000		ori	$a0,$a0,0x00
+  100 004000ec 0000010c	 	syscall	$print_string            # Newline
+  101 004000f0 03e00008		jr	$ra
+  102                   
+  103                   leap_check:
+  104                  		li	$t0,4
+  104 004000f4 34080004		ori	$t0,$0,0x04
+  105 004000f8 0208001a		div	$s0,$t0
+  106 004000fc 00004810		mfhi	$t1
+  107                  		li	$t2,0
+  107 00400100 340a0000		ori	$t2,$0,0x00
+  108 00400104 152a0008		bne	$t1,$t2,not_leap_year
+  109                  		li	$t0,100
+  109 00400108 34080064		ori	$t0,$0,0x64
+  110 0040010c 0208001a		div	$s0,$t0
+  111 00400110 00004810		mfhi	$t1
+  112 00400114 152a0006		bne	$t1,$t2,leap_year
+  113                  		li	$t0,400
+  113 00400118 34080190		ori	$t0,$0,0x190
+  114 0040011c 0208001a		div	$s0,$t0
+  115 00400120 00004810		mfhi	$t1
+  116 00400124 112a0002		beq	$t1,$t2,leap_year
+  117                   not_leap_year:
+  118                  		li	$s7,0      # Not a leap year
+  118 00400128 34170000		ori	$s7,$0,0x00
+  119 0040012c 03e00008		jr	$ra
+  120                   leap_year:
+  121                  		li	$s7,1      # Leap year
+  121 00400130 34170001		ori	$s7,$0,0x01
+  122 00400134 03e00008		jr	$ra
+  123                   
+  124                   calc_days:
+  125 00400138 16e00006		bne	$s7,$0,1f	# Calculates days in current month
+  126                  		la	$t4,days_normal	# Non leap year
+  126 0040013c 3c0c1001		lui	$t4,0x1001
+  126 00400140 358c0092		ori	$t4,$t4,0x92
+  127 00400144 01916020		add	$t4,$t4,$s1
+  128 00400148 218cffff		addi	$t4,$t4,-1
+  129 0040014c 81980000		lb	$t8,0($t4)
+  130 00400150 0810005a		j	2f
+  131                   
+  132                   1:
+  133                  		la	$t4,days_leap	# Leap year
+  133 00400154 3c0c1001		lui	$t4,0x1001
+  133 00400158 358c009e		ori	$t4,$t4,0x9E
+  134 0040015c 01916020		add	$t4,$t4,$s1
+  135 00400160 218cffff		addi	$t4,$t4,-1
+  136 00400164 81980000		lb	$t8,0($t4)
+  137                   2:
+  138 00400168 03e00008		jr	$ra
+  139                   
+  140                   calculate_day_of_week: # A modified Zeller's Congruence
+  141                       # Adjust month and year for January and February
+  142                  		blt	$s1,3,adjust_year  # If month is January or February, adjust year
+  142                  		li	$at,3
+  142 0040016c 34010003		ori	$at,$0,0x03
+  142 00400170 0221082a		slt	$at,$s1,$at
+  142 00400174 14200001		bne	$at,$0,adjust_year
+  143 00400178 08100061		j	3f
+  144                   adjust_year:
+  145 0040017c 2231000c		addi	$s1,$s1,12    # January becomes 13, February becomes 14
+  146 00400180 2210ffff		addi	$s0,$s0,-1    # Decrement year
+  147                   3:
+  148                   	# Compute K and J
+  149                  		li	$t0,100
+  149 00400184 34080064		ori	$t0,$0,0x64
+  150 00400188 0208001a		div	$s0,$t0         # Divide year by 100
+  151 0040018c 00004810		mfhi	$t1             # $t1 = K (year % 100)
+  152 00400190 00005012		mflo	$t2             # $t2 = J (year / 100)
+  153                   	
+  154                   	# Zeller's formula calculation
+  155                  		li	$t3,13
+  155 00400194 340b000d		ori	$t3,$0,0x0D
+  156 00400198 222c0001		addi	$t4,$s1,1     # $t4 = m + 1
+  157                  		mul	$t4,$t4,$t3    # $t4 = (m + 1) * 13
+  157 0040019c 018b0018		mult	$t4,$t3
+  157 004001a0 00006012		mflo	$t4
+  158                  		div	$t4,$t4,5      # $t4 = floor((m + 1) * 13 / 5)
+  158                  		li	$at,5
+  158 004001a4 34010005		ori	$at,$0,0x05
+  158 004001a8 0181001a		div	$t4,$at
+  158 004001ac 00006012		mflo	$t4
+  159 004001b0 00006012		mflo	$t4             # $t4 = floor((m + 1) * 13 / 5)
+  160                   	
+  161 004001b4 01896820		add	$t5,$t4,$t1    # $t5 = floor((m + 1) * 13 / 5) + K
+  162 004001b8 01aa6820		add	$t5,$t5,$t2    # $t5 = floor((m + 1) * 13 / 5) + K + J
+  163 004001bc 21ad0001		addi	$t5,$t5,1     # Add day of the month (1st)
+  164                   	
+  165                   	# Divisions to compute the rest of the Zeller's formula
+  166                  		div	$t6,$t1,4      # t6 = floor(K / 4)
+  166                  		li	$at,4
+  166 004001c0 34010004		ori	$at,$0,0x04
+  166 004001c4 0121001a		div	$t1,$at
+  166 004001c8 00007012		mflo	$t6
+  167 004001cc 00007012		mflo	$t6
+  168 004001d0 01ae6820		add	$t5,$t5,$t6    # Add floor(K / 4)
+  169                   	
+  170                  		div	$t6,$t2,4      # t6 = floor(J / 4)
+  170                  		li	$at,4
+  170 004001d4 34010004		ori	$at,$0,0x04
+  170 004001d8 0141001a		div	$t2,$at
+  170 004001dc 00007012		mflo	$t6
+  171 004001e0 00007012		mflo	$t6
+  172 004001e4 01ae6820		add	$t5,$t5,$t6    # Add floor(J / 4)
+  173                   	
+  174                  		li	$t6,2
+  174 004001e8 340e0002		ori	$t6,$0,0x02
+  175                  		mul	$t6,$t6,$t2    # t6 = 2 * J
+  175 004001ec 01ca0018		mult	$t6,$t2
+  175 004001f0 00007012		mflo	$t6
+  176 004001f4 01ae6822		sub	$t5,$t5,$t6    # Subtract 2 * J
+  177                   	
+  178                   	# Final day of the week calculation
+  179                  		li	$t6,7
+  179 004001f8 340e0007		ori	$t6,$0,0x07
+  180                  		rem	$t6,$t5,$t6    # h = result % 7
+  180 004001fc 15c00001		bne	$t6,$0,08f
+  180 00400200 0000000d		break
+  180 00400204 01ae001a	08:	div	$t5,$t6
+  180 00400208 00007010		mfhi	$t6
+  181 0040020c 21ce0001		addi	$t6,$t6,1	
+  182                   
+  183                   	# Modify the day index to start from Sunday
+  184                  		li	$t7,6
+  184 00400210 340f0006		ori	$t7,$0,0x06
+  185 00400214 11c80002		beq	$t6,$t0,adjust_saturday # If $t6 is 0 (Saturday), adjust to 6
+  186 00400218 21ceffff		addi	$t6,$t6,-1             # Otherwise, subtract 1 to start from Sunday
+  187 0040021c 08100089		j	finish_adjustment
+  188                   adjust_saturday:
+  189 00400220 01e07021		move	$t6,$t7                 # Set $t6 to 6 for Saturday
+  190                   	
+  191                   finish_adjustment:
+  192 00400224 01c0c821		move	$t9,$t6                 # Move adjusted result to $t9
+  193                   
+  194                   
+  195 00400228 03e00008		jr	$ra               # Return from the function
+  196                   	
+  197                   
+  198                   
+  199                   main:
+  200 0040022c 0c100000		jal	getDate          # Get current date
+  201                   
+  202                  		la	$t2,monthNames	# Calculates the month name
+  202 00400230 3c0a1001		lui	$t2,0x1001
+  202 00400234 354a005c		ori	$t2,$t2,0x5C
+  203 00400238 00115880		sll	$t3,$s1,2
+  204 0040023c 014b5020		add	$t2,$t2,$t3
+  205                   
+  206 00400240 0c100019		jal	print_date	# Prints the date
+  207                   
+  208 00400244 0c10003d		jal	leap_check	# Checks if year is leap year, stores it in $s7. 1 = leap. 0 = no leap
+  209                   	
+  210 00400248 0c10004e		jal	calc_days	# Calculates the number of days in month, stores in $t8
+  211                   	
+  212 0040024c 0c10005b		jal	calculate_day_of_week	# Calculates which day is first day of the month, stores in $t9 (0=Sunady,1=Monday,...)
+  213                   	
+  214                   
+  215                   
+  216                   	##########################################################################
+  217                   	#Calendar Printing
+  218                   
+  219                  		.data
+  220 100100aa 096e7553	header:	.asciiz	"Sun\tMon\tTue\tWed\tThu\tFri\tSat\n"
+  221 100100c7 0009	tab:	.asciiz	"\t" 
+  222                   
+  223 100100c9 20202020	digit_col_line1: .asciiz "    "
+  224 100100ce 20fe2020	digit_col_line2: .asciiz "  \xfe "
+  225 100100d3 20202020	digit_col_line3: .asciiz "    "
+  226 100100d8 20fe2020	digit_col_line4: .asciiz "  \xfe "
+  227 100100dd 20202020	digit_col_line5: .asciiz "    "
+  228                   
+  229 100100e2 20fefefe	digit_0_line1: .asciiz "\xfe\xfe\xfe "
+  230 100100e7 20fe20fe	digit_0_line2: .asciiz "\xfe \xfe "
+  231 100100ec 20fe20fe	digit_0_line3: .asciiz "\xfe \xfe "
+  232 100100f1 20fe20fe	digit_0_line4: .asciiz "\xfe \xfe "
+  233 100100f6 20fefefe	digit_0_line5: .asciiz "\xfe\xfe\xfe "
+  234                   
+  235 100100fb 2020fe20	digit_1_line1: .asciiz " \xfe  "
+  236 10010100 2020fe20	digit_1_line2: .asciiz " \xfe  "
+  237 10010105 2020fe20	digit_1_line3: .asciiz " \xfe  "
+  238 1001010a 2020fe20	digit_1_line4: .asciiz " \xfe  "
+  239 1001010f 2020fe20	digit_1_line5: .asciiz " \xfe  "
+  240                   
+  241 10010114 20fefefe	digit_2_line1:	.asciiz	"\xfe\xfe\xfe "
+  242 10010119 20fe2020	digit_2_line2: .asciiz "  \xfe "
+  243 1001011e 20fefefe	digit_2_line3: .asciiz "\xfe\xfe\xfe "
+  244 10010123 202020fe	digit_2_line4: .asciiz "\xfe   "
+  245 10010128 20fefefe	digit_2_line5: .asciiz "\xfe\xfe\xfe "
+  246                   
+  247 1001012d 20fefefe	digit_3_line1:	.asciiz "\xfe\xfe\xfe "
+  248 10010132 20fe2020	digit_3_line2:	.asciiz "  \xfe "
+  249 10010137 20fefefe	digit_3_line3:	.asciiz "\xfe\xfe\xfe "
+  250 1001013c 20fe2020	digit_3_line4:	.asciiz "  \xfe "
+  251 10010141 20fefefe	digit_3_line5:	.asciiz "\xfe\xfe\xfe "
+  252                   
+  253 10010146 20fe20fe	digit_4_line1:	.asciiz "\xfe \xfe "
+  254 1001014b 20fe20fe	digit_4_line2:	.asciiz "\xfe \xfe "
+  255 10010150 20fefefe	digit_4_line3:	.asciiz "\xfe\xfe\xfe "
+  256 10010155 20fe2020	digit_4_line4:	.asciiz "  \xfe "
+  257 1001015a 20fe2020	digit_4_line5:	.asciiz "  \xfe "
+  258                   
+  259 1001015f 20fefefe	digit_5_line1:	.asciiz "\xfe\xfe\xfe "
+  260 10010164 202020fe	digit_5_line2:	.asciiz "\xfe   "
+  261 10010169 20fefefe	digit_5_line3:	.asciiz "\xfe\xfe\xfe "
+  262 1001016e 20fe2020	digit_5_line4:	.asciiz "  \xfe "
+  263 10010173 20fefefe	digit_5_line5:	.asciiz "\xfe\xfe\xfe "
+  264                   
+  265 10010178 20fefefe	digit_6_line1:	.asciiz "\xfe\xfe\xfe "
+  266 1001017d 202020fe	digit_6_line2:	.asciiz "\xfe   "
+  267 10010182 20fefefe	digit_6_line3:	.asciiz "\xfe\xfe\xfe "
+  268 10010187 20fe20fe	digit_6_line4:	.asciiz "\xfe \xfe "
+  269 1001018c 20fefefe	digit_6_line5:	.asciiz "\xfe\xfe\xfe "
+  270                   
+  271 10010191 20fefefe	digit_7_line1:	.asciiz "\xfe\xfe\xfe "
+  272 10010196 20fe2020	digit_7_line2:	.asciiz "  \xfe "
+  273 1001019b 20fe2020	digit_7_line3:	.asciiz "  \xfe "
+  274 100101a0 20fe2020	digit_7_line4:	.asciiz "  \xfe "
+  275 100101a5 20fe2020	digit_7_line5:	.asciiz "  \xfe "
+  276                   
+  277 100101aa 20fefefe	digit_8_line1:	.asciiz "\xfe\xfe\xfe "
+  278 100101af 20fe20fe	digit_8_line2:	.asciiz "\xfe \xfe "
+  279 100101b4 20fefefe	digit_8_line3:	.asciiz "\xfe\xfe\xfe "
+  280 100101b9 20fe20fe	digit_8_line4:	.asciiz "\xfe \xfe "
+  281 100101be 20fefefe	digit_8_line5:	.asciiz "\xfe\xfe\xfe "
+  282                   
+  283 100101c3 20fefefe	digit_9_line1:	.asciiz "\xfe\xfe\xfe "
+  284 100101c8 20fe20fe	digit_9_line2:	.asciiz "\xfe \xfe "
+  285 100101cd 20fefefe	digit_9_line3:	.asciiz "\xfe\xfe\xfe "
+  286 100101d2 20fe2020	digit_9_line4:	.asciiz "  \xfe "
+  287 100101d7 20fefefe	digit_9_line5:	.asciiz "\xfe\xfe\xfe "
+  288                   
+  289                  		.text
+  290                   
+  291                  		la	$a0,header
+  291 00400250 3c041001		lui	$a0,0x1001
+  291 00400254 348400aa		ori	$a0,$a0,0xAA
+  292 00400258 0000010c		syscall	$print_string
+  293                   	
+  294                   	# Load total days and start day
+  295 0040025c 03005021		move	$t2,$t8      # Total days in the month
+  296 00400260 03205821		move	$t3,$t9         # Starting day of the week
+  297                   	
+  298                   	# Initial spacing based on the starting day of the week
+  299                  		li	$t1,0
+  299 00400264 34090000		ori	$t1,$0,0x00
+  300                   initial_spacing:
+  301                   	# Day printing loop
+  302                  		li	$t0,1                # Start from day 1
+  302 00400268 34080001		ori	$t0,$0,0x01
+  303 0040026c 112b0005		beq	$t1,$t3,print_days
+  304                  		la	$a0,tab
+  304 00400270 3c041001		lui	$a0,0x1001
+  304 00400274 348400c7		ori	$a0,$a0,0xC7
+  305 00400278 0000010c		syscall	$print_string
+  306 0040027c 21290001		addi	$t1,$t1,1
+  307 00400280 0810009a		j	initial_spacing
+  308                   	
+  309                   
+  310                   print_days:
+  311                  		bgt	$t0,$t2,print_big_time   # Exit to big time if all days are printed
+  311 00400284 0148082a		slt	$at,$t2,$t0
+  311 00400288 1420002a		bne	$at,$0,print_big_time
+  312                   
+  313                   	# Print the day
+  314 0040028c 01002021		move	$a0,$t0
+  315 00400290 0000004c		syscall	$print_int
+  316                   	
+  317                   	# Print a tab
+  318                  		la	$a0,tab
+  318 00400294 3c041001		lui	$a0,0x1001
+  318 00400298 348400c7		ori	$a0,$a0,0xC7
+  319 0040029c 0000010c		syscall	$print_string
+  320                   	
+  321                   	# Check if the day is the end of the week
+  322 004002a0 21290001		addi	$t1,$t1,1      # Increment position in the week
+  323                  		li	$t4,7
+  323 004002a4 340c0007		ori	$t4,$0,0x07
+  324                  		rem	$t5,$t1,$t4
+  324 004002a8 15800001		bne	$t4,$0,08f
+  324 004002ac 0000000d		break
+  324 004002b0 012c001a	08:	div	$t1,$t4
+  324 004002b4 00006810		mfhi	$t5
+  325 004002b8 11a00002		beqz	$t5,new_line
+  326                   	
+  327 004002bc 21080001		addi	$t0,$t0,1      # Increment day of the month
+  328 004002c0 081000a1		j	print_days
+  329                   
+  330                   new_line:
+  331                   	# Print a new line
+  332                  		la	$a0,newline
+  332 004002c4 3c041001		lui	$a0,0x1001
+  332 004002c8 34840000		ori	$a0,$a0,0x00
+  333 004002cc 0000010c		syscall	$print_string
+  334                  		li	$t1,0             # Reset week position
+  334 004002d0 34090000		ori	$t1,$0,0x00
+  335 004002d4 21080001		addi	$t0,$t0,1      # Increment day of the month
+  336 004002d8 081000a1		j	print_days
+  337                   
+  338                   print_columns:
+  339                  		li	$v1,25
+  339 004002dc 34030019		ori	$v1,$0,0x19
+  340                   
+  341                  		mul	$t2,$v1,$t1	# Number
+  341 004002e0 00690018		mult	$v1,$t1
+  341 004002e4 00005012		mflo	$t2
+  342 004002e8 004a2020		add	$a0,$v0,$t2
+  343 004002ec 0000010c		syscall	$print_string
+  344                   
+  345                   
+  346                  		mul	$t2,$v1,$t0
+  346 004002f0 00680018		mult	$v1,$t0
+  346 004002f4 00005012		mflo	$t2
+  347 004002f8 004a2020		add	$a0,$v0,$t2
+  348 004002fc 0000010c		syscall	$print_string
+  349                   
+  350                  		mul	$t2,$v1,$t3
+  350 00400300 006b0018		mult	$v1,$t3
+  350 00400304 00005012		mflo	$t2
+  351 00400308 004a2020		add	$a0,$v0,$t2
+  352 0040030c 0000010c		syscall	$print_string
+  353                   
+  354                  		mul	$t2,$v1,$t4
+  354 00400310 006c0018		mult	$v1,$t4
+  354 00400314 00005012		mflo	$t2
+  355 00400318 004a2020		add	$a0,$v0,$t2
+  356 0040031c 0000010c		syscall	$print_string
+  357                   
+  358                  		mul	$t2,$v1,$t5
+  358 00400320 006d0018		mult	$v1,$t5
+  358 00400324 00005012		mflo	$t2
+  359 00400328 004a2020		add	$a0,$v0,$t2
+  360 0040032c 0000010c		syscall	$print_string
+  361                   
+  362 00400330 03e00008		jr	$ra
+  363                   
+  364                   print_big_time:
+  365                   
+  366 00400334 23bdfff8		addi	$sp,$sp,-8
+  367 00400338 afb80000		sw	$t8,0($sp)
+  368 0040033c afb90004		sw	$t9,4($sp)
+  369                   
+  370                   	
+  371                   	
+  372 00400340 02602021		mov	$a0,$s3	# Number - 1, 0 = Colon
+  373 00400344 0c1000fb		jal	isolate_digits
+  374 00400348 03004821		mov	$t1,$t8
+  375                  		addi	$t1,1
+  375 0040034c 21290001		addi	$t1,$t1,1
+  376 00400350 03204021		mov	$t0,$t9
+  377                  		addi	$t0,1
+  377 00400354 21080001		addi	$t0,$t0,1
+  378                   
+  379 00400358 8fb90004		lw	$t9,4($sp)
+  380 0040035c 8fb80000		lw	$t8,0($sp)
+  381 00400360 23bd0008		addi	$sp,$sp,8
+  382                   
+  383                   
+  384                  		li	$t3,0	# Colon
+  384 00400364 340b0000		ori	$t3,$0,0x00
+  385                   
+  386                   
+  387                   
+  388 00400368 02802021		mov	$a0,$s4	# Number - 1, 0 = Colon
+  389 0040036c 0c1000fb		jal	isolate_digits
+  390 00400370 03006021		mov	$t4,$t8
+  391                  		addi	$t4,1
+  391 00400374 218c0001		addi	$t4,$t4,1
+  392 00400378 03206821		mov	$t5,$t9
+  393                  		addi	$t5,1
+  393 0040037c 21ad0001		addi	$t5,$t5,1
+  394                   	
+  395                   
+  396                  		la	$a0,newline
+  396 00400380 3c041001		lui	$a0,0x1001
+  396 00400384 34840000		ori	$a0,$a0,0x00
+  397 00400388 0000010c	 	syscall	$print_string
+  398                   
+  399                  		la	$v0,digit_col_line1
+  399 0040038c 3c021001		lui	$v0,0x1001
+  399 00400390 344200c9		ori	$v0,$v0,0xC9
+  400 00400394 0c1000b7		jal	print_columns
+  401                   
+  402                  		la	$a0,newline
+  402 00400398 3c041001		lui	$a0,0x1001
+  402 0040039c 34840000		ori	$a0,$a0,0x00
+  403 004003a0 0000010c	 	syscall	$print_string
+  404                   
+  405                  		addi	$v0,5
+  405 004003a4 20420005		addi	$v0,$v0,5
+  406 004003a8 0c1000b7		jal	print_columns
+  407                  		la	$a0,newline
+  407 004003ac 3c041001		lui	$a0,0x1001
+  407 004003b0 34840000		ori	$a0,$a0,0x00
+  408 004003b4 0000010c	 	syscall	$print_string
+  409                  		addi	$v0,5
+  409 004003b8 20420005		addi	$v0,$v0,5
+  410 004003bc 0c1000b7		jal	print_columns
+  411                  		la	$a0,newline
+  411 004003c0 3c041001		lui	$a0,0x1001
+  411 004003c4 34840000		ori	$a0,$a0,0x00
+  412 004003c8 0000010c	 	syscall	$print_string
+  413                  		addi	$v0,5
+  413 004003cc 20420005		addi	$v0,$v0,5
+  414 004003d0 0c1000b7		jal	print_columns
+  415                  		la	$a0,newline
+  415 004003d4 3c041001		lui	$a0,0x1001
+  415 004003d8 34840000		ori	$a0,$a0,0x00
+  416 004003dc 0000010c	 	syscall	$print_string
+  417                  		addi	$v0,5
+  417 004003e0 20420005		addi	$v0,$v0,5
+  418 004003e4 0c1000b7		jal	print_columns
+  419 004003e8 08100100		j	exit
+  420                   
+  421                   isolate_digits:
+  422                  		li	$t6,10        # Load the divisor, which is 10, into $t0.
+  422 004003ec 340e000a		ori	$t6,$0,0x0A
+  423 004003f0 008e001a		div	$a0,$t6      # Divide the input number by 10.
+  424 004003f4 0000c012		mflo	$t8          # Move the quotient (tens place) into $t8.
+  425 004003f8 0000c810		mfhi	$t9          # Move the remainder (ones place) into $t9.
+  426 004003fc 03e00008		jr	$ra            # Return to the calling function.
+  427                   
+  428                   
+  429                   
+  430                   exit:
+  431                   	# Exit program
+  432 00400400 0000028c		syscall	$exit
+                 	
